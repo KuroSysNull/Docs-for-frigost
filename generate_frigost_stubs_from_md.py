@@ -396,11 +396,7 @@ def parse_returns_from_md(md: str) -> list[tuple[str, str]]:
             out.append((typ or "any", norm_space(strip_md_links(desc))))
     return out
 
-def parse_object_fields_from_md(md: str) -> list[tuple[str, str]]:
-    """
-    For object pages: find a table with header containing 'membre' (FR) or 'member'.
-    Fields as (name, lua_type).
-    """
+def collect_tables_from_md(md: str) -> list[list[list[str]]]:
     lines = md.splitlines()
     tables = []
 
@@ -419,6 +415,15 @@ def parse_object_fields_from_md(md: str) -> list[tuple[str, str]]:
     if not tables:
         tables = parse_html_tables(md)
 
+    return tables
+
+def parse_object_fields_from_md(md: str) -> list[tuple[str, str]]:
+    """
+    For object pages: find a table with header containing 'membre' (FR) or 'member'.
+    Fields as (name, lua_type).
+    """
+    tables = collect_tables_from_md(md)
+
     for t in tables:
         if not t or len(t) < 2:
             continue
@@ -434,6 +439,60 @@ def parse_object_fields_from_md(md: str) -> list[tuple[str, str]]:
             return fields
 
     return []
+
+def parse_object_enum_from_md(md: str, obj_name: str) -> dict[str, list[tuple[str, str | None]]]:
+    """
+    For enum-like object pages (ex: objets/stats.md), extract values from fenced
+    code blocks or fallback to name/value tables.
+    Returns {enum_name: [(value_name, value_literal_or_none), ...]}.
+    """
+    enums: dict[str, list[tuple[str, str | None]]] = {}
+
+    for block in re.findall(r"```[a-zA-Z0-9_-]*\s*(.*?)```", md, flags=re.S):
+        for enum_name, member in re.findall(r"\b(enum_[A-Za-z0-9_]+)\.([A-Za-z0-9_]+)\b", block):
+            items = enums.setdefault(enum_name, [])
+            if all(member != x[0] for x in items):
+                items.append((member, None))
+
+    if enums:
+        return enums
+
+    tables = collect_tables_from_md(md)
+
+    def find_col(header, keys):
+        for k in keys:
+            for idx, h in enumerate(header):
+                if k in h:
+                    return idx
+        return None
+
+    for t in tables:
+        if not t or len(t) < 2:
+            continue
+        header = [c.lower() for c in t[0]]
+        if any("membre" in h or "member" in h for h in header):
+            continue
+
+        c_name = find_col(header, ["nom", "name", "stat", "statistique", "statistic"])
+        c_val = find_col(header, ["id", "valeur", "value", "code"])
+        if c_name is None:
+            continue
+
+        values: list[tuple[str, str | None]] = []
+        for row in t[1:]:
+            if c_name >= len(row):
+                continue
+            name = md_to_text(row[c_name]).strip()
+            val = md_to_text(row[c_val]).strip() if c_val is not None and c_val < len(row) else ""
+            if not name:
+                continue
+            values.append((name, val or None))
+
+        if values:
+            safe_obj = re.sub(r"[^\w]", "_", obj_name).strip("_") or "Object"
+            return {f"Frigost{safe_obj}Enum": values}
+
+    return {}
 
 # --------------------------------------------------
 # Alias naming
@@ -475,6 +534,7 @@ def main():
 
     namespaces: dict[str, list] = {}
     objects: dict[str, list] = {}
+    object_enums: dict[str, list[tuple[str, str | None]]] = {}
     written_aliases = set()
 
     # --------------------------------------------------
@@ -527,6 +587,10 @@ def main():
         fields = parse_object_fields_from_md(md)
         if fields:
             objects[name] = fields
+        else:
+            enum_vals = parse_object_enum_from_md(md, name)
+            if enum_vals:
+                object_enums.update(enum_vals)
 
         time.sleep(SLEEP)
 
@@ -539,6 +603,22 @@ def main():
 
     with open(OUT_FILE, "w", encoding="utf-8") as f:
         f.write("---@meta\n\n")
+
+        # Object enums
+        for enum_name, values in sorted(object_enums.items()):
+            safe_enum = re.sub(r"[^\w]", "_", enum_name).strip("_") or "Enum"
+            if safe_enum in written_aliases:
+                continue
+            written_aliases.add(safe_enum)
+
+            f.write(f"---@class {safe_enum}\n")
+            for val_name, val in values:
+                safe_val = re.sub(r"[^\w]", "_", val_name).strip("_") or val_name
+                if val:
+                    f.write(f"---@field {safe_val} integer @ {val}\n")
+                else:
+                    f.write(f"---@field {safe_val} integer\n")
+            f.write(f"{safe_enum} = {{}}\n\n")
 
         # Objects
         for obj, fields in sorted(objects.items()):
