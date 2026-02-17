@@ -1,5 +1,82 @@
 ---@meta
 
+---@class AccessibleCell
+---@field index integer
+---@field cellId integer
+---@field distance integer
+---@field farScore integer
+---@field losScore integer
+---@field remainingMP integer
+---@field remainingAP integer
+---@field tackleLostMP integer
+---@field tackleLostAP integer
+---@field pathCells integer
+local AccessibleCell = {}
+
+---@class Challenge
+---@field id integer
+---@field name string
+---@field targets integer
+---@field state integer
+local Challenge = {}
+
+---@class Fighter
+---@field id integer
+---@field carriedId integer
+---@field type integer
+---@field name string
+---@field team integer
+---@field isSummoned boolean
+---@field masterId integer
+---@field cellId integer
+---@field AP integer
+---@field MP integer
+---@field Range integer
+---@field level integer
+---@field breedId integer
+---@field companionId integer
+---@field creatureGenericId integer
+---@field lifePoints integer
+---@field maxLifePoints integer
+---@field invisibilityState integer
+---@field isInvulnerable_isInvulnerableMelee_isInvulnerableRange boolean
+---@field summonsCount integer
+---@field stats any
+---@field states any[]
+local Fighter = {}
+
+---@class Spell
+---@field priority integer
+---@field spell_id integer
+---@field target_type integer
+---@field target_ids string
+---@field life_condition integer
+---@field life_value integer
+---@field starting_turn_condition integer
+---@field starting_turn integer
+---@field starting_turn_mod integer
+---@field every_x_turn integer
+---@field repeat_max integer
+---@field max_per_target integer
+---@field hand_to_hand integer
+---@field cast_distance_condition integer
+---@field cast_distance integer
+---@field target_vulnerable boolean
+---@field target_invulnerable boolean
+---@field target_invulnerable_melee boolean
+---@field target_invulnerable_range boolean
+---@field adjacent_type integer
+local Spell = {}
+
+---@class State
+---@field sourceId integer
+---@field stateId integer
+---@field spellId integer
+---@field uid integer
+---@field duration integer
+---@field dissipated integer
+local State = {}
+
 ---@class Frigost_basicFight
 local basicFight = {}
 

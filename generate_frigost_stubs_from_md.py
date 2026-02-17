@@ -251,6 +251,23 @@ def extract_first_md_table(block: str) -> list[list[str]] | None:
                 return parse_md_table_lines(tbl)
     return None
 
+def parse_html_tables(html: str) -> list[list[list[str]]]:
+    if not html:
+        return []
+    soup = BeautifulSoup(html, "html.parser")
+    tables = []
+    for table in soup.find_all("table"):
+        rows = []
+        for tr in table.find_all("tr"):
+            cells = tr.find_all(["th", "td"])
+            if not cells:
+                continue
+            row = [norm_space(c.get_text(" ")) for c in cells]
+            rows.append(row)
+        if rows:
+            tables.append(rows)
+    return tables
+
 def extract_proto_from_md(md: str) -> str | None:
     block = extract_section(md, "## 🔍 Prototype")
     code = extract_first_fenced_code(block, "lua")
@@ -399,6 +416,9 @@ def parse_object_fields_from_md(md: str) -> list[tuple[str, str]]:
             continue
         i += 1
 
+    if not tables:
+        tables = parse_html_tables(md)
+
     for t in tables:
         if not t or len(t) < 2:
             continue
@@ -407,8 +427,8 @@ def parse_object_fields_from_md(md: str) -> list[tuple[str, str]]:
             fields = []
             for row in t[1:]:
                 if len(row) >= 2:
-                    fname = row[0].strip()
-                    ftyp = row[1].strip()
+                    fname = md_to_text(row[0]).strip()
+                    ftyp = md_to_text(row[1]).strip()
                     if fname:
                         fields.append((fname, lua_type(ftyp)))
             return fields
